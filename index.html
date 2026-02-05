@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dot Matrix OCR Enterprise System</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="8" fill="url(#gradient)"/>
+                        <path d="M12 20L18 26L28 14" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+                                <stop offset="0%" stop-color="#667eea"/>
+                                <stop offset="100%" stop-color="#764ba2"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div>
+                        <h1>Dot Matrix OCR</h1>
+                        <p class="subtitle">Demonstration</p>
+                    </div>
+                </div>
+                <div class="header-stats">
+                    <div class="stat">
+                        <span class="stat-value">Optical Character Recognition</span>
+                        <span class="stat-label">Pipeline</span>
+                    </div>
+                    <div class="stat">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="upload-section" id="uploadSection">
+            <div class="upload-card">
+                <div class="upload-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                </div>
+                <h2>Upload Image for OCR Processing</h2>
+                <p class="upload-description">
+                    Drag and drop your dot matrix image here, or click to browse.<br>
+                    Supported formats: JPG, PNG, JPEG
+                </p>
+                <input type="file" id="fileInput" accept="image/*" hidden>
+                <button class="btn-primary" id="uploadBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Choose Image
+                </button>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+        </section>
+
+        <!-- Processing Section -->
+        <section class="processing-section hidden" id="processingSection">
+            <div class="processing-card">
+                <div class="processing-spinner">
+                    <div class="spinner"></div>
+                </div>
+                <h2>Processing Your Image</h2>
+                <p class="processing-status" id="processingStatus">Initializing OCR pipeline...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">0%</p>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section hidden" id="resultsSection">
+            <div class="results-header">
+                <h2>Processing Results</h2>
+                <button class="btn-secondary" id="newAnalysisBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    New Analysis
+                </button>
+            </div>
+
+            <!-- OCR Result Card -->
+            <div class="result-card ocr-result-card">
+                <div class="card-header">
+                    <h3>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        OCR Result
+                    </h3>
+                    <span class="badge badge-success">Completed</span>
+                </div>
+                <div class="ocr-output">
+                    <div class="ocr-text" id="ocrResult">-</div>
+                    <button class="btn-copy" id="copyBtn" title="Copy to clipboard">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pipeline Visualization -->
+            <div class="pipeline-section">
+                <h3 class="section-title">Processing Pipeline</h3>
+                <p class="section-description">View each stage of the OCR processing pipeline</p>
+                
+                <div class="pipeline-grid">
+                    <!-- Original Image -->
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">1</span>
+                            <h4>Original Image</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgOriginal" alt="Original Image">
+                        </div>
+                        <p class="pipeline-description">Input image uploaded for processing</p>
+                    </div>
+
+                    <!-- Illumination Corrected -->
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">2</span>
+                            <h4>Illumination Correction</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgIllumination" alt="Illumination Corrected">
+                        </div>
+                        <p class="pipeline-description">Normalized brightness across the image</p>
+                    </div>
+
+                    <!-- Thresholded -->
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">3</span>
+                            <h4>Thresholding</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgThreshold" alt="Thresholded">
+                        </div>
+                        <p class="pipeline-description">Binary conversion for feature extraction</p>
+                    </div>
+
+                    <!-- Clustered -->
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">4</span>
+                            <h4>Cluster Detection</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgClustered" alt="Clustered">
+                        </div>
+                        <p class="pipeline-description">Connected component analysis</p>
+                    </div>
+
+                    <!-- DBSCAN -->
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">5</span>
+                            <h4>DBSCAN Filtering</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgDbscan" alt="DBSCAN">
+                        </div>
+                        <p class="pipeline-description">Density-based spatial clustering</p>
+                    </div>
+
+                    <!-- Deskewed -->
+                    <div class="pipeline-card">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">6</span>
+                            <h4>Deskewing</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgDeskewed" alt="Deskewed">
+                        </div>
+                        <p class="pipeline-description">Rotation correction and alignment</p>
+                    </div>
+
+                    <!-- Final -->
+                    <div class="pipeline-card pipeline-card-featured">
+                        <div class="pipeline-header">
+                            <span class="pipeline-number">7</span>
+                            <h4>Final Processed</h4>
+                        </div>
+                        <div class="image-container">
+                            <img id="imgFinal" alt="Final Processed">
+                        </div>
+                        <p class="pipeline-description">Optimized image ready for OCR</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Section -->
+        <section class="error-section hidden" id="errorSection">
+            <div class="error-card">
+                <div class="error-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <h2>Processing Error</h2>
+                <p class="error-message" id="errorMessage">An error occurred during processing.</p>
+                <button class="btn-primary" id="retryBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    Try Again
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast hidden" id="toast">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span id="toastMessage">Action completed</span>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
