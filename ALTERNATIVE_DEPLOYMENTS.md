@@ -150,7 +150,8 @@ Upload files directly through Hugging Face interface.
    - Dockerfile
    - README.md
    - index.html
-   - static/ folder contents
+   - script.js
+   - styles.css
 4. **Add API Key** in Settings
 5. **Build starts automatically**
 

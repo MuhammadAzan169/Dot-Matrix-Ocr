@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['metal-engraving-text']
+
+roboflow:
+  workspace: phoenix-ocr-2aq8b
+  project: metal-engraving-text
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/phoenix-ocr-2aq8b/metal-engraving-text/dataset/1

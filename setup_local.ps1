@@ -44,7 +44,7 @@ if (-not (Test-Path "uploads")) {
 
 # Check if static files exist
 Write-Host "Verifying project structure..." -ForegroundColor White
-$requiredFiles = @("app.py", "index.html", "requirements.txt", "Dockerfile", "README.md")
+$requiredFiles = @("app.py", "index.html", "requirements.txt", "Dockerfile", "README.md", "script.js", "styles.css")
 $missingFiles = @()
 
 foreach ($file in $requiredFiles) {
@@ -54,20 +54,6 @@ foreach ($file in $requiredFiles) {
         Write-Host "  ✗ $file (MISSING!)" -ForegroundColor Red
         $missingFiles += $file
     }
-}
-
-if (Test-Path "static\script.js") {
-    Write-Host "  ✓ static/script.js" -ForegroundColor Green
-} else {
-    Write-Host "  ✗ static/script.js (MISSING!)" -ForegroundColor Red
-    $missingFiles += "static/script.js"
-}
-
-if (Test-Path "static\styles.css") {
-    Write-Host "  ✓ static/styles.css`n" -ForegroundColor Green
-} else {
-    Write-Host "  ✗ static/styles.css (MISSING!)`n" -ForegroundColor Red
-    $missingFiles += "static/styles.css"
 }
 
 if ($missingFiles.Count -gt 0) {

@@ -11,21 +11,30 @@ import os
 import uuid
 from pathlib import Path
 import shutil
-from dotenv import load_dotenv
 import logging
+import time
 
-# Configure logging
+# Initialize FastAPI app FIRST
+app = FastAPI(title="Dot Matrix OCR Enterprise System")
+
+# Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-logger.info("Environment variables loaded")
+logger.info("Checking environment variables...")
 
-app = FastAPI(title="Dot Matrix OCR Enterprise System")
+# Get environment variables directly (Hugging Face sets these)
+api_key = os.getenv("OPENROUTER_API_KEY")
+model = os.getenv("OCR_MODEL", "openrouter/free")  # Default to free
+
+if not api_key:
+    logger.warning("OPENROUTER_API_KEY environment variable not set")
+else:
+    logger.info(f"API key found: {bool(api_key)}")
+    logger.info(f"OCR model configured: {model}")
 
 # CORS middleware
 app.add_middleware(
@@ -41,9 +50,9 @@ UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 logger.info(f"Upload directory created/verified: {UPLOAD_DIR.absolute()}")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-logger.info("Static files mounted")
+# Serve static files (CSS, JS) from root
+# app.mount("/static", StaticFiles(directory="."), name="static")
+logger.info("Static files mounted at /static")
 
 logger.info("FastAPI app initialized successfully")
 
@@ -364,14 +373,12 @@ class VLMOCR:
     def __init__(self, api_key):
         logger.info("Initializing VLMOCR with OpenAI client")
         try:
-            # Import httpx and create a client that ignores proxies
             import httpx
 
             # Create httpx client with no proxy support
             http_client = httpx.Client(
                 timeout=60.0,
                 follow_redirects=True,
-                # Explicitly disable all proxy handling
                 trust_env=False  # Don't trust environment variables for proxies
             )
 
@@ -388,57 +395,106 @@ class VLMOCR:
             logger.error(f"Exception type: {type(e).__name__}")
             raise
     
-    def perform_ocr(self, image_path):
-        """Perform OCR using VLM"""
+    def perform_ocr(self, image_path, max_retries=3):
+        """Perform OCR using VLM with retry logic for rate limiting"""
         logger.debug(f"Starting VLM OCR for image: {image_path}")
 
-        try:
-            # Verify client is initialized
-            if not hasattr(self, 'client') or self.client is None:
-                raise ValueError("OpenAI client not properly initialized")
+        if not hasattr(self, 'client') or self.client is None:
+            raise ValueError("OpenAI client not properly initialized")
 
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        # Use environment variable directly
+        model = os.getenv("OCR_MODEL", "openrouter/free")
+        logger.info(f"Using OCR model: {model}")
 
-            logger.debug(f"Image encoded to base64, length: {len(base64_image)} characters")
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-            logger.info("Making OpenAI API call to OpenRouter")
-            completion = self.client.chat.completions.create(
-                model="mistralai/mistral-small-3.1-24b-instruct:free",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "What are the digits mentioned in the image? Answer in one line nothing else only digits."
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{base64_image}"
+        logger.debug(f"Image encoded to base64, length: {len(base64_image)} characters")
+
+        last_error = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"Making OpenAI API call to OpenRouter (attempt {attempt}/{max_retries}) with model: {model}")
+                completion = self.client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "What are the digits mentioned in the image? Answer in one line nothing else only digits."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{base64_image}"
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ]
-            )
+                            ]
+                        }
+                    ],
+                    max_tokens=50  # Limit tokens for faster response
+                )
 
-            result = completion.choices[0].message.content
-            logger.info(f"OpenAI API call successful, result: '{result}'")
-            return result
+                if not completion.choices or len(completion.choices) == 0:
+                    logger.error(f"API response missing choices: {completion}")
+                    raise ValueError("API response missing choices")
 
-        except Exception as e:
-            logger.error(f"OpenAI API call failed: {str(e)}", exc_info=True)
-            logger.error(f"Error type: {type(e).__name__}")
-            logger.error(f"Image path exists: {os.path.exists(image_path)}")
-            if os.path.exists(image_path):
-                logger.error(f"Image file size: {os.path.getsize(image_path)} bytes")
+                choice = completion.choices[0]
+                if not choice.message:
+                    logger.error(f"API response choice missing message: {choice}")
+                    raise ValueError("API response choice missing message")
+
+                result = choice.message.content
+                if not result or not result.strip():
+                    logger.warning(f"API returned empty or whitespace-only result: '{result}'")
+                    raise ValueError("API returned empty OCR result")
+                
+                # Clean up result - keep only digits
+                cleaned_result = ''.join(filter(str.isdigit, result))
+                if cleaned_result:
+                    result = cleaned_result
+                
+                logger.info(f"OpenAI API call successful, result: '{result}'")
+                return result
+
+            except Exception as e:
+                last_error = e
+                logger.error(f"OpenAI API call failed (attempt {attempt}/{max_retries}): {str(e)}")
+                logger.error(f"Error type: {type(e).__name__}")
+
+                # Check if it's a rate limit error (429) - retry with backoff
+                is_rate_limit = '429' in str(e) or 'rate' in str(e).lower() or 'quota' in str(e).lower()
+                if is_rate_limit and attempt < max_retries:
+                    wait_time = 2 ** attempt * 5  # 10s, 20s, 40s
+                    logger.warning(f"Rate limited (429). Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                    
+                    # If rate limited on free model, you might want to switch to another free model
+                    # but openrouter/free should handle this automatically
+                    continue
+                elif not is_rate_limit:
+                    # Non-rate-limit error, don't retry
+                    break
+
+        # All retries exhausted
+        logger.error(f"All {max_retries} attempts failed for OCR")
+        raise HTTPException(
+            status_code=503,
+            detail="OCR service is temporarily unavailable. Free models might be rate-limited. Please try again in a minute or consider using a specific model."
+        )
+
+# =============================================================================
 # API ENDPOINTS
 # =============================================================================
 
 @app.get("/")
 async def read_root():
+    return FileResponse("index.html")
+
+@app.get("/index.html")
+async def read_index():
     return FileResponse("index.html")
 
 @app.post("/api/process")
@@ -448,13 +504,19 @@ async def process_image(
     """Process uploaded image through the entire OCR pipeline"""
     logger.info(f"Received processing request for file: {file.filename}, size: {file.size} bytes")
 
-    # Get API key from environment variable
+    # Get API key from environment variable (set by Hugging Face Secrets)
     api_key = os.getenv("OPENROUTER_API_KEY")
-    logger.info(f"API key present: {bool(api_key)}")
+    
     if not api_key:
         logger.error("OPENROUTER_API_KEY environment variable not set")
-        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY environment variable not set")
-
+        logger.error("Please set OPENROUTER_API_KEY in Hugging Face Space Secrets")
+        raise HTTPException(
+            status_code=500, 
+            detail="OCR service not configured. Please contact the administrator."
+        )
+    
+    logger.info(f"API key present: {bool(api_key)}")
+    
     try:
         logger.info("Starting image processing pipeline")
 
@@ -497,7 +559,14 @@ async def process_image(
         final_path = session_dir / "7_final.png"
         vlm_ocr = VLMOCR(api_key)
         logger.info(f"Performing OCR on: {final_path}")
-        ocr_result = vlm_ocr.perform_ocr(final_path)
+        try:
+            ocr_result = vlm_ocr.perform_ocr(final_path)
+        except Exception as ocr_err:
+            logger.error(f"OCR failed after retries: {ocr_err}")
+            raise HTTPException(
+                status_code=503,
+                detail="OCR service is temporarily unavailable (rate limited). Please try again in a minute."
+            )
         logger.info(f"OCR completed, result length: {len(ocr_result) if ocr_result else 0} characters")
         
         # Convert images to base64 for response
@@ -525,9 +594,24 @@ async def process_image(
         
     except Exception as e:
         logger.error(f"Error in process_image: {str(e)}", exc_info=True)
-        logger.error(f"Session directory: {session_dir}")
-        logger.error(f"Original file exists: {original_path.exists() if 'original_path' in locals() else 'N/A'}")
+        if 'session_dir' in locals():
+            logger.error(f"Session directory: {session_dir}")
+        if 'original_path' in locals():
+            logger.error(f"Original file exists: {original_path.exists()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# Serve CSS and JS files
+@app.get("/styles.css")
+async def get_css():
+    return FileResponse("styles.css")
+
+@app.get("/script.js")
+async def get_js():
+    return FileResponse("script.js")
+
+@app.get("/favicon.ico")
+async def get_favicon():
+    return FileResponse("favicon.ico", media_type="image/x-icon")
 
 if __name__ == "__main__":
     import uvicorn
@@ -535,6 +619,6 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 7860))  # HF Spaces uses port 7860 by default
     logger.info(f"Starting server on port {port}")
     logger.info(f"Upload directory: {UPLOAD_DIR.absolute()}")
-    logger.info(f"Static directory: {Path('static').absolute()}")
+    logger.info(f"Static directory: {Path('.').absolute()}")
     logger.info(f"Index file exists: {Path('index.html').exists()}")
     uvicorn.run(app, host="0.0.0.0", port=port)

@@ -57,7 +57,8 @@ Or manually copy these files:
 - `Dockerfile`
 - `README.md`
 - `.gitignore`
-- `static/` folder (with all contents)
+- `script.js`
+- `styles.css`
 - `uploads/` folder (only `.gitkeep` file, not the uploaded images)
 
 ### Step 4: Configure Environment Variables
@@ -156,7 +157,7 @@ git push
 
 ### Change the Theme
 
-Edit [`static/styles.css`](static/styles.css) to modify colors:
+Edit [`styles.css`](styles.css) to modify colors:
 
 ```css
 :root {

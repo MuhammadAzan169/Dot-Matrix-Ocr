@@ -176,7 +176,7 @@ For more help, see **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** → Troublesho
 
 After deployment, you can customize:
 
-- **Colors/Theme**: Edit `static/styles.css`
+- **Colors/Theme**: Edit `styles.css`
 - **AI Model**: Change model in `app.py` line 337
 - **Processing Parameters**: Adjust values in `ImageProcessor` class
 - **UI Text**: Modify `index.html`

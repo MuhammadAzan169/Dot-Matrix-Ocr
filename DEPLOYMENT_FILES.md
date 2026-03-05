@@ -60,8 +60,8 @@
 ### Existing Files (No Changes)
 
 - ✓ index.html
-- ✓ static/script.js
-- ✓ static/styles.css
+- ✓ script.js
+- ✓ styles.css
 
 ---
 
@@ -134,10 +134,9 @@ app/
 ├── index.html            # Frontend HTML
 ├── README.md             # Space description
 ├── requirements.txt      # Python dependencies
+├── script.js             # Frontend JavaScript
 ├── setup_local.ps1       # Local setup script
-├── static/
-│   ├── script.js         # Frontend JavaScript
-│   └── styles.css        # Frontend CSS
+├── styles.css            # Frontend CSS
 └── uploads/
     └── .gitkeep          # Keep directory in git
 ```

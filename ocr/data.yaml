@@ -1,0 +1,5 @@
+names:
+- engraved_text
+nc: 1
+train: C:\Users\muham\OneDrive\Desktop\ocr\data\images\train
+val: C:\Users\muham\OneDrive\Desktop\ocr\data\images\valid

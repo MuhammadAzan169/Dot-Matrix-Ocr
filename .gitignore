@@ -44,3 +44,20 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Secrets and keys
+secrets.*
+*.key
+*.pem
+*.crt
+
+# Config files with possible API keys
+config/*.json
+config/*.yaml
+
+# Jupyter notebook checkpoints
+*.ipynb_checkpoints
+
+# Test output and coverage
+.coverage
+htmlcov/
