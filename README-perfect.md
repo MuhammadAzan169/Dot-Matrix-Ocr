@@ -41,7 +41,7 @@ The pipeline includes:
 
 ### API Usage
 ```bash
-curl -X POST "https://your-space.hf.space/api/process" -F "file=@your_image.png"
+curl -X POST "http://localhost:8000/api/process" -F "file=@your_image.png"
 ```
 Response:
 ```json
@@ -52,20 +52,6 @@ Response:
   "ocr_result": "1234567890"
 }
 ```
-
-## 🏗️ Technical Stack
-| Layer           | Technology                | Purpose                      |
-|-----------------|--------------------------|------------------------------|
-| Backend         | FastAPI (Python)         | REST API server              |
-| Image Processing| OpenCV, scikit-learn     | Computer vision pipeline     |
-| AI/ML           | OpenAI VLM via OpenRouter| Text recognition             |
-| Frontend        | Vanilla JS + Modern CSS  | Interactive UI               |
-| Deployment      | Docker + Hugging Face    | Cloud hosting                |
-| Storage         | Session-based file system| Temporary image storage      |
-
-## ⚙️ Configuration
-- Set `OPENROUTER_API_KEY` and `OCR_MODEL` environment variables
-- See README for Hugging Face Spaces setup
 
 ## 🐳 Local Development
 ```bash
@@ -97,7 +83,7 @@ python app.py
 MIT License
 
 ## 🙏 Credits
-- FastAPI, OpenCV, OpenRouter, Hugging Face
+- FastAPI, OpenCV, OpenRouter
 
 ---
 

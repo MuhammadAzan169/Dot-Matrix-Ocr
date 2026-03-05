@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 logger.info("Checking environment variables...")
 
-# Get environment variables directly (Hugging Face sets these)
+# Get environment variables
 api_key = os.getenv("OPENROUTER_API_KEY")
 model = os.getenv("OCR_MODEL", "openrouter/free")  # Default to free
 
@@ -504,12 +504,12 @@ async def process_image(
     """Process uploaded image through the entire OCR pipeline"""
     logger.info(f"Received processing request for file: {file.filename}, size: {file.size} bytes")
 
-    # Get API key from environment variable (set by Hugging Face Secrets)
+    # Get API key from environment variable (set in environment or .env)
     api_key = os.getenv("OPENROUTER_API_KEY")
     
     if not api_key:
         logger.error("OPENROUTER_API_KEY environment variable not set")
-        logger.error("Please set OPENROUTER_API_KEY in Hugging Face Space Secrets")
+        logger.error("Please set OPENROUTER_API_KEY in your environment or .env file")
         raise HTTPException(
             status_code=500, 
             detail="OCR service not configured. Please contact the administrator."
@@ -615,8 +615,8 @@ async def get_favicon():
 
 if __name__ == "__main__":
     import uvicorn
-    # Use PORT environment variable for Hugging Face Spaces compatibility
-    port = int(os.getenv("PORT", 7860))  # HF Spaces uses port 7860 by default
+    # Use PORT environment variable for deployment compatibility
+    port = int(os.getenv("PORT", 8000))
     logger.info(f"Starting server on port {port}")
     logger.info(f"Upload directory: {UPLOAD_DIR.absolute()}")
     logger.info(f"Static directory: {Path('.').absolute()}")

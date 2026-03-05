@@ -1,17 +1,5 @@
----
-title: Dot Matrix OCR Enterprise System
-emoji: 🔍
-colorFrom: purple
-colorTo: blue
-sdk: docker
-pinned: false
-license: mit
-app_port: 7860
----
-
 # 🔍 Dot Matrix OCR Enterprise System
 
-[![Hugging Face Spaces](https://img.shields.io/badge/Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)](https://fastapi.tiangolo.com)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.8.1-red)](https://opencv.org)
 
@@ -59,7 +47,7 @@ The system processes images through a sophisticated 7-stage pipeline:
 
 ### API Usage
 ```bash
-curl -X POST "https://your-space.hf.space/api/process" \
+curl -X POST "http://localhost:8000/api/process" \
   -F "file=@your_image.png"
 ```
 
@@ -89,27 +77,22 @@ curl -X POST "https://your-space.hf.space/api/process" \
 | **Image Processing** | OpenCV, scikit-learn, NumPy | Computer vision pipeline |
 | **AI/ML** | OpenAI VLM via OpenRouter | Text recognition |
 | **Frontend** | Vanilla JS + Modern CSS | Interactive UI |
-| **Deployment** | Docker + Hugging Face Spaces | Cloud hosting |
+| **Deployment** | Docker (container) | Cloud or local container hosting |
 | **Storage** | Session-based file system | Temporary image storage |
 
 ## ⚙️ Configuration
 
-### Hugging Face Spaces Setup
-1. **Create a new Space** with Docker SDK
-2. **Upload all files** from this repository
-3. **Set Repository Secrets** in Space Settings:
-   - `OPENROUTER_API_KEY`: Your OpenRouter API key
-   - `OCR_MODEL`: `openrouter/free` (default, optional)
+### Deployment
+Follow the instructions for your chosen host. For local testing and container deployments, set the environment variables and run the container or the app directly.
 
 ### Get OpenRouter API Key
 1. Visit [OpenRouter](https://openrouter.ai)
 2. Sign up and get your API key
-3. Add $1 credit for 10,000+ free requests
 
 ### Environment Variables
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `7860` | Server port (auto-set by Hugging Face) |
+| `PORT` | `8000` | Server port (default for local/container deployments) |
 | `OPENROUTER_API_KEY` | Required | Your OpenRouter API key |
 | `OCR_MODEL` | `openrouter/free` | Model to use for OCR |
 
@@ -117,11 +100,7 @@ curl -X POST "https://your-space.hf.space/api/process" \
 
 ### Quick Start
 ```bash
-# 1. Clone repository
-git clone https://huggingface.co/spaces/your-username/dot-matrix-ocr
-cd dot-matrix-ocr
-
-# 2. Install dependencies
+# 1. Install dependencies
 pip install -r requirements.txt
 
 # 3. Set environment variable
@@ -135,7 +114,7 @@ python app.py
 ```bash
 # Build and run with Docker
 docker build -t dot-matrix-ocr .
-docker run -p 7860:7860 -e OPENROUTER_API_KEY="your-key" dot-matrix-ocr
+docker run -p 8000:8000 -e OPENROUTER_API_KEY="your-key" dot-matrix-ocr
 ```
 
 ## 📁 Project Structure
@@ -217,13 +196,13 @@ MIT License - See [LICENSE](LICENSE) file for details.
 - **FastAPI**: Modern web framework for building APIs
 - **OpenCV**: Industry-standard computer vision library
 - **OpenRouter**: Unified API for AI models
-- **Hugging Face**: For providing free hosting on Spaces
+-- **Container hosting**: For running the app in Docker on any host
 
 ## 🌟 Support
 
 For issues, feature requests, or questions:
 1. Check the [FAQ](#) section
-2. Open an issue on the Hugging Face Space
+2. Open an issue on the project repository or your hosting provider
 3. Contact the maintainer
 
 ---

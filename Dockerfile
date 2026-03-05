@@ -1,4 +1,4 @@
-# Docker configuration for Hugging Face Spaces
+# Docker configuration for containerized deployment
 FROM python:3.10-slim-bookworm
 
 # Set working directory
@@ -26,11 +26,11 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Expose port 7860 (Hugging Face Spaces default)
-EXPOSE 7860
+# Expose port 8000 (local / generic deployment)
+EXPOSE 8000
 
 # Set environment variable for port
-ENV PORT=7860
+ENV PORT=8000
 
 # Run the application
 CMD ["python", "app.py"]

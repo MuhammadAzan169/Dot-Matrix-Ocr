@@ -1,5 +1,5 @@
 # Quick Start Script for Local Testing
-# Run this before deploying to Hugging Face Spaces
+# Run this for local testing and deployment
 
 Write-Host "🚀 Dot Matrix OCR - Local Testing Setup" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
@@ -69,12 +69,12 @@ Write-Host "To start the server, run:" -ForegroundColor White
 Write-Host "  python app.py`n" -ForegroundColor Yellow
 
 Write-Host "The app will be available at:" -ForegroundColor White
-Write-Host "  http://localhost:7860`n" -ForegroundColor Cyan
+Write-Host "  http://localhost:8000`n" -ForegroundColor Cyan
 
-Write-Host "Before deploying to Hugging Face:" -ForegroundColor White
+Write-Host "Before deploying to any remote host:" -ForegroundColor White
 Write-Host "  1. Test the app locally" -ForegroundColor White
 Write-Host "  2. Ensure OPENROUTER_API_KEY is set in .env" -ForegroundColor White
-Write-Host "  3. Review DEPLOYMENT_GUIDE.md" -ForegroundColor White
+Write-Host "  3. Review deployment documentation" -ForegroundColor White
 Write-Host "  4. DO NOT commit your .env file!`n" -ForegroundColor Yellow
 
 $startNow = Read-Host "Start the server now? (Y/N)"
