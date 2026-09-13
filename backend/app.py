@@ -34,14 +34,71 @@ logger = logging.getLogger(__name__)
 
 logger.info("Checking environment variables...")
 
-# Get environment variables
-api_key = os.getenv("OPENROUTER_API_KEY")
-model = os.getenv("OCR_MODEL", "openrouter/free")  # Default to free
+PLACEHOLDER_KEYS = {"your-openrouter-api-key-here", "sk-or-v1-...", ""}
 
-if not api_key:
-    logger.warning("OPENROUTER_API_KEY environment variable not set")
+
+def collect_api_keys():
+    """Every OpenRouter key available, in the order they should be tried.
+
+    Accepts OPENROUTER_API_KEY plus numbered OPENROUTER_API_KEY1, _KEY2, ...
+    Free OpenRouter keys have tight per-key rate limits, so holding more than
+    one and failing over is the difference between "try again in a minute" and
+    an answer. Numbered keys are read in numeric order, not alphabetical, so
+    _KEY10 does not jump ahead of _KEY2.
+    """
+    keys = []
+    primary = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+    if primary and primary not in PLACEHOLDER_KEYS:
+        keys.append(primary)
+
+    numbered = []
+    for name, value in os.environ.items():
+        if not name.startswith("OPENROUTER_API_KEY"):
+            continue
+        suffix = name[len("OPENROUTER_API_KEY"):]
+        if not suffix.isdigit():
+            continue
+        value = (value or "").strip()
+        if value and value not in PLACEHOLDER_KEYS:
+            numbered.append((int(suffix), value))
+
+    for _, value in sorted(numbered):
+        if value not in keys:  # a key listed twice buys nothing
+            keys.append(value)
+    return keys
+
+
+# A free vision model that reliably returns plain text. NOT "openrouter/free":
+# that router picks a random free model per call, and it will happily route an
+# OCR request to a content-safety classifier or a reasoning model that burns the
+# whole token budget before emitting any content.
+DEFAULT_OCR_MODEL = "google/gemma-4-31b-it:free"
+DEFAULT_FALLBACK_MODELS = "google/gemma-4-26b-a4b-it:free,openrouter/free"
+
+
+def collect_models():
+    """The models to try, in order. Same idea as multiple keys: when a free
+    model is busy or unavailable, the next one usually is not."""
+    models = [(os.getenv("OCR_MODEL") or DEFAULT_OCR_MODEL).strip()]
+    fallbacks = os.getenv("OCR_FALLBACK_MODELS", DEFAULT_FALLBACK_MODELS)
+    for name in fallbacks.split(","):
+        name = name.strip()
+        if name and name not in models:
+            models.append(name)
+    return models
+
+
+# Get environment variables
+api_keys = collect_api_keys()
+model = collect_models()[0]
+
+if not api_keys:
+    logger.warning(
+        "No OpenRouter key found. Set OPENROUTER_API_KEY (or OPENROUTER_API_KEY1, "
+        "OPENROUTER_API_KEY2, ... to rotate between several) in backend/.env"
+    )
 else:
-    logger.info(f"API key found: {bool(api_key)}")
+    logger.info(f"OpenRouter keys loaded: {len(api_keys)}")
     logger.info(f"OCR model configured: {model}")
 
 # CORS middleware
@@ -389,120 +446,153 @@ class ImageProcessor:
 # VLM OCR
 # =============================================================================
 
+def is_rate_limit(error):
+    """OpenRouter signals an exhausted free quota with 429, but the message
+    wording varies by upstream provider, so check both."""
+    text = str(error).lower()
+    return "429" in text or "rate" in text or "quota" in text
+
+
 class VLMOCR:
-    def __init__(self, api_key):
-        logger.info("Initializing VLMOCR with OpenAI client")
+    def __init__(self, api_keys):
+        """Takes every available key. Each gets its own client, built once and
+        reused, so failing over between keys costs nothing."""
+        if isinstance(api_keys, str):  # tolerate a single key
+            api_keys = [api_keys]
+        self.api_keys = [k for k in api_keys if k]
+        if not self.api_keys:
+            raise ValueError("VLMOCR requires at least one API key")
+
+        logger.info(f"Initializing VLMOCR with {len(self.api_keys)} key(s)")
         try:
             import httpx
 
-            # Create httpx client with no proxy support
-            http_client = httpx.Client(
+            # One httpx client shared by all keys: no proxy trust, fixed timeout.
+            self.http_client = httpx.Client(
                 timeout=60.0,
                 follow_redirects=True,
                 trust_env=False  # Don't trust environment variables for proxies
             )
 
-            # Create OpenAI client with custom httpx client
-            self.client = OpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=api_key,
-                http_client=http_client
-            )
-            logger.info("OpenAI client initialized successfully with custom httpx client")
+            self.clients = [
+                OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=key,
+                    http_client=self.http_client,
+                )
+                for key in self.api_keys
+            ]
+            # Kept so existing code referring to .client still works.
+            self.client = self.clients[0]
+            logger.info("OpenAI clients initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client: {str(e)}", exc_info=True)
             logger.error(f"Exception type: {type(e).__name__}")
             raise
     
-    def perform_ocr(self, image_path, max_retries=3):
-        """Perform OCR using VLM with retry logic for rate limiting"""
+    def _read_digits(self, client, model, base64_image):
+        """One OCR call against one key. Raises on anything unusable."""
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "What are the digits mentioned in the image? Answer in one line nothing else only digits."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            # 50 was too tight: a model that thinks before answering spends the
+            # entire budget on reasoning tokens and returns finish_reason
+            # "length" with content=None. The reply itself is still one short
+            # line, so this costs nothing when the model does not reason.
+            max_tokens=300
+        )
+
+        if not completion.choices:
+            raise ValueError("API response missing choices")
+        choice = completion.choices[0]
+        if not choice.message:
+            raise ValueError("API response choice missing message")
+
+        result = choice.message.content
+        if not result or not result.strip():
+            raise ValueError("API returned empty OCR result")
+
+        # Clean up result - keep only digits
+        cleaned = ''.join(filter(str.isdigit, result))
+        return cleaned or result
+
+    def perform_ocr(self, image_path, max_rounds=3):
+        """Read the digits, rotating across every key before backing off.
+
+        Free OpenRouter keys are rate-limited individually, so a 429 on one key
+        says nothing about the next. Trying each key first turns a minute-long
+        wait into an immediate retry; only when every key is limited in the same
+        round does it sleep, with the same exponential backoff as before.
+        """
         logger.debug(f"Starting VLM OCR for image: {image_path}")
 
-        if not hasattr(self, 'client') or self.client is None:
-            raise ValueError("OpenAI client not properly initialized")
-
-        # Use environment variable directly
-        model = os.getenv("OCR_MODEL", "openrouter/free")
-        logger.info(f"Using OCR model: {model}")
+        models = collect_models()
+        logger.info(f"OCR models to try, in order: {models}")
 
         with open(image_path, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-
         logger.debug(f"Image encoded to base64, length: {len(base64_image)} characters")
 
         last_error = None
-        for attempt in range(1, max_retries + 1):
-            try:
-                logger.info(f"Making OpenAI API call to OpenRouter (attempt {attempt}/{max_retries}) with model: {model}")
-                completion = self.client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": "What are the digits mentioned in the image? Answer in one line nothing else only digits."
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/png;base64,{base64_image}"
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    max_tokens=50  # Limit tokens for faster response
+        for round_index in range(1, max_rounds + 1):
+            # Models outer, keys inner: a model that is wrong for the task fails
+            # the same way on every key, so exhaust the keys before moving on
+            # only for quota errors, which is what the loop below does.
+            for model in models:
+                for key_index, client in enumerate(self.clients, start=1):
+                    try:
+                        logger.info(
+                            f"OCR call: model {model}, key {key_index}/{len(self.clients)}, "
+                            f"round {round_index}/{max_rounds}"
+                        )
+                        result = self._read_digits(client, model, base64_image)
+                        logger.info(f"OCR succeeded via {model}: '{result}'")
+                        return result
+
+                    except Exception as e:
+                        last_error = e
+                        logger.error(
+                            f"OCR failed (model {model}, key {key_index}, "
+                            f"round {round_index}): {type(e).__name__}: {e}"
+                        )
+                        if is_rate_limit(e):
+                            continue  # another key may still have quota
+                        break  # not a quota issue — this model is the problem
+
+            if round_index < max_rounds:
+                wait_time = 2 ** round_index * 5  # 10s, 20s
+                logger.warning(
+                    f"All {len(self.clients)} key(s) rate limited. "
+                    f"Waiting {wait_time}s before round {round_index + 1}..."
                 )
+                time.sleep(wait_time)
 
-                if not completion.choices or len(completion.choices) == 0:
-                    logger.error(f"API response missing choices: {completion}")
-                    raise ValueError("API response missing choices")
-
-                choice = completion.choices[0]
-                if not choice.message:
-                    logger.error(f"API response choice missing message: {choice}")
-                    raise ValueError("API response choice missing message")
-
-                result = choice.message.content
-                if not result or not result.strip():
-                    logger.warning(f"API returned empty or whitespace-only result: '{result}'")
-                    raise ValueError("API returned empty OCR result")
-                
-                # Clean up result - keep only digits
-                cleaned_result = ''.join(filter(str.isdigit, result))
-                if cleaned_result:
-                    result = cleaned_result
-                
-                logger.info(f"OpenAI API call successful, result: '{result}'")
-                return result
-
-            except Exception as e:
-                last_error = e
-                logger.error(f"OpenAI API call failed (attempt {attempt}/{max_retries}): {str(e)}")
-                logger.error(f"Error type: {type(e).__name__}")
-
-                # Check if it's a rate limit error (429) - retry with backoff
-                is_rate_limit = '429' in str(e) or 'rate' in str(e).lower() or 'quota' in str(e).lower()
-                if is_rate_limit and attempt < max_retries:
-                    wait_time = 2 ** attempt * 5  # 10s, 20s, 40s
-                    logger.warning(f"Rate limited (429). Waiting {wait_time}s before retry...")
-                    time.sleep(wait_time)
-                    
-                    # If rate limited on free model, you might want to switch to another free model
-                    # but openrouter/free should handle this automatically
-                    continue
-                elif not is_rate_limit:
-                    # Non-rate-limit error, don't retry
-                    break
-
-        # All retries exhausted
-        logger.error(f"All {max_retries} attempts failed for OCR")
+        logger.error(f"Every model/key combination failed after {max_rounds} rounds")
+        if last_error is not None and not is_rate_limit(last_error):
+            raise HTTPException(status_code=502, detail=f"OCR provider error: {last_error}")
         raise HTTPException(
             status_code=503,
-            detail="OCR service is temporarily unavailable. Free models might be rate-limited. Please try again in a minute or consider using a specific model."
+            detail=(
+                "The free OCR models are rate-limited right now. Please try again "
+                "in a minute, or add another OPENROUTER_API_KEY."
+            )
         )
 
 # =============================================================================
@@ -524,7 +614,8 @@ async def read_root():
 async def health():
     """Cheap liveness probe. Render pings this, and it is also handy for
     waking the free-tier instance before a user uploads an image."""
-    return {"status": "healthy", "configured": bool(os.getenv("OPENROUTER_API_KEY"))}
+    keys = collect_api_keys()
+    return {"status": "healthy", "configured": bool(keys), "api_keys": len(keys)}
 
 @app.post("/api/process")
 async def process_image(
@@ -533,18 +624,19 @@ async def process_image(
     """Process uploaded image through the entire OCR pipeline"""
     logger.info(f"Received processing request for file: {file.filename}, size: {file.size} bytes")
 
-    # Get API key from environment variable (set in environment or .env)
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    
-    if not api_key:
-        logger.error("OPENROUTER_API_KEY environment variable not set")
-        logger.error("Please set OPENROUTER_API_KEY in your environment or .env file")
+    # Read the keys per request, so a key added to the environment takes effect
+    # without a restart.
+    api_keys = collect_api_keys()
+
+    if not api_keys:
+        logger.error("No OpenRouter API key configured")
+        logger.error("Set OPENROUTER_API_KEY (or OPENROUTER_API_KEY1, _KEY2, ...) in backend/.env")
         raise HTTPException(
-            status_code=500, 
-            detail="OCR service not configured. Please contact the administrator."
+            status_code=500,
+            detail="OCR service not configured: no OpenRouter API key was found on the server."
         )
     
-    logger.info(f"API key present: {bool(api_key)}")
+    logger.info(f"API keys available: {len(api_keys)}")
     
     try:
         logger.info("Starting image processing pipeline")
@@ -586,16 +678,12 @@ async def process_image(
         # Step 3: VLM OCR
         logger.info("Starting Step 3: VLM OCR")
         final_path = session_dir / "7_final.png"
-        vlm_ocr = VLMOCR(api_key)
+        vlm_ocr = VLMOCR(api_keys)
         logger.info(f"Performing OCR on: {final_path}")
-        try:
-            ocr_result = vlm_ocr.perform_ocr(final_path)
-        except Exception as ocr_err:
-            logger.error(f"OCR failed after retries: {ocr_err}")
-            raise HTTPException(
-                status_code=503,
-                detail="OCR service is temporarily unavailable (rate limited). Please try again in a minute."
-            )
+        # perform_ocr raises an HTTPException that already says what went wrong
+        # (503 rate limited, 502 provider error); the handler re-raises those
+        # untouched, so no wrapping here.
+        ocr_result = vlm_ocr.perform_ocr(final_path)
         logger.info(f"OCR completed, result length: {len(ocr_result) if ocr_result else 0} characters")
         
         # Convert images to base64 for response

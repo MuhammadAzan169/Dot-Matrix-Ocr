@@ -78,6 +78,10 @@ docker compose -f backend/docker-compose.yml -f frontend/docker-compose.yml up -
 7. Tapered lines joining nearby dots within each block
 8. Vision-model read of the reconstructed image (OpenRouter)
 
+The final step tries every configured API key, then every fallback model, before
+backing off — free-tier keys and models are rate-limited independently, so a
+failure on one rarely means a failure on the next.
+
 Every stage is returned to the UI as an image, so you can see where a bad read
 went wrong.
 

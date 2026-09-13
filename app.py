@@ -95,7 +95,10 @@ app = api
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the full Dot Matrix OCR stack locally.")
     parser.add_argument("--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", 8000)),
+    # Deliberately NOT PORT: backend/.env sets PORT for the deployed service
+    # (Render's 10000), and importing the backend pulls that in — which silently
+    # moved this launcher off the documented 8000. LOCAL_PORT overrides instead.
+    parser.add_argument("--port", type=int, default=int(os.getenv("LOCAL_PORT", 8000)),
                         help="port to listen on (default: 8000)")
     parser.add_argument("--reload", action="store_true", help="restart when source files change")
     args = parser.parse_args()

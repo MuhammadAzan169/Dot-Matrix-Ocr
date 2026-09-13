@@ -22,7 +22,9 @@ See [.env.example](.env.example). Only `OPENROUTER_API_KEY` is required.
 | Variable             | Default           | Notes                                       |
 | -------------------- | ----------------- | ------------------------------------------- |
 | `OPENROUTER_API_KEY` | —                 | Required. Set as a secret in Render.         |
-| `OCR_MODEL`          | `openrouter/free` | Vision model used for the final read.        |
+| `OPENROUTER_API_KEY1`, `_KEY2`, … | — | Optional extra keys, rotated on rate limits. |
+| `OCR_MODEL`          | `google/gemma-4-31b-it:free` | Vision model for the final read. |
+| `OCR_FALLBACK_MODELS` | `google/gemma-4-26b-a4b-it:free,openrouter/free` | Tried in order if the primary fails. |
 | `ALLOWED_ORIGINS`    | `*`               | Comma-separated. Set to your Vercel URL(s).  |
 | `PORT`               | `10000`           | Render injects this automatically.           |
 | `KEEP_UPLOADS`       | `0`               | `1` keeps intermediate images in `uploads/`. |
@@ -31,6 +33,20 @@ See [.env.example](.env.example). Only `OPENROUTER_API_KEY` is required.
 `.env` is loaded automatically from this folder, whatever directory you start
 the process from. Real environment variables always win, which is how Render
 and docker-compose override it.
+
+### Keys and models both fail over
+
+Free OpenRouter keys are rate-limited individually, so the server tries every
+key it can find before waiting, then every fallback model, and only then backs
+off (10s, 20s) and repeats. Number extra keys from 1; they are tried in numeric
+order after the unnumbered one.
+
+Do not use `openrouter/free` as the **primary** model. It routes each call to a
+random free model, which includes models that cannot do this job — a request
+here was routed to `nvidia/nemotron-3.5-content-safety:free`, a safety
+classifier, which spent its whole token budget on reasoning and returned no
+content at all. It is fine as a last-resort fallback, which is where it now
+sits.
 
 ## Run locally
 
