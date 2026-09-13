@@ -82,21 +82,79 @@ docker compose -f backend/docker-compose.yml -f frontend/docker-compose.yml up -
 
 ## Pipeline
 
-1. Adaptive illumination correction (divide by a heavy Gaussian blur)
-2. Binary threshold + morphological close
-3. Connected components, filtered by area
-4. DBSCAN over component centroids to drop background speckle
-5. Deskew via `minAreaRect`, then crop
-6. Vertical projection to split digit blocks
-7. Tapered lines joining nearby dots within each block
-8. Vision-model read of the reconstructed image (OpenRouter)
+The dots are never read directly. They are cleaned, filtered, straightened and
+joined into solid glyphs first, and only that reconstruction is shown to the
+vision model. Every stage below is also returned to the UI, so when a read comes
+out wrong you can see exactly which step lost it.
 
-The final step tries every configured API key, then every fallback model, before
-backing off — free-tier keys and models are rate-limited independently, so a
-failure on one rarely means a failure on the next.
+Run these yourself with `python backend/tests/make_pipeline_docs.py`.
 
-Every stage is returned to the UI as an image, so you can see where a bad read
-went wrong.
+### 1. Original
+
+The photo as uploaded: dot-peen digits on steel, lit unevenly, slightly tilted.
+
+![Original](docs/pipeline/1-original.png)
+
+### 2. Illumination correction
+
+Dividing by a heavy Gaussian blur removes the lighting gradient while keeping
+the dots. Without this, a single threshold cannot serve both the bright and the
+dark end of the plate.
+
+![Illumination corrected](docs/pipeline/2-illumination.png)
+
+### 3. Threshold
+
+A fixed binary threshold plus a morphological close, now that the lighting is
+flat. The dots survive; so does some surface grain.
+
+![Thresholded](docs/pipeline/3-threshold.png)
+
+### 4. Connected components
+
+Each blob is measured and anything too small to be a dot is discarded. What
+remains (green) is dot-shaped, but includes marks that are not part of the text.
+
+![Connected components](docs/pipeline/4-clusters.png)
+
+### 5. DBSCAN
+
+Clustering the blob centroids separates the text — where dots have many close
+neighbours — from isolated speckle, which is labelled noise and dropped. This is
+the step that decides what counts as writing.
+
+![DBSCAN](docs/pipeline/5-dbscan.png)
+
+### 6. Deskew
+
+`minAreaRect` measures the tilt of the surviving dots, the image is rotated flat
+and cropped to the text.
+
+![Deskewed](docs/pipeline/6-deskewed.png)
+
+### 7. Join the dots
+
+A vertical projection splits the line into digit blocks, then tapered lines
+connect neighbouring dots inside each block, turning a scatter of dots into
+strokes a vision model can read.
+
+![Final reconstruction](docs/pipeline/7-final.png)
+
+### 8. Read
+
+The reconstruction goes to a vision model via OpenRouter. That step tries every
+configured API key, then every fallback model, before backing off — free-tier
+keys and models are rate-limited independently, so a failure on one rarely means
+a failure on the next.
+
+### Where it goes wrong
+
+Most bad reads are lost before the model ever sees the image. Compare stage 7
+against the plate: if a digit is malformed or missing there, no model will
+recover it. On the `gas-cylinder` sample, for instance, vignetting dims the
+right-hand edge enough that DBSCAN drops the final `0`, and the read comes back
+six digits instead of seven. That is a tuning problem in steps 3-5, not a model
+problem.
 
 ## Deploying
 
