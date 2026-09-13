@@ -4,7 +4,9 @@ FastAPI service that runs the image pipeline (illumination correction →
 thresholding → connected components → DBSCAN → deskew → digit-block joining)
 and then reads the digits with a vision model via OpenRouter.
 
-Deployed to **Render (free tier)** as a Docker web service.
+Deployed to **Render (free tier)** as a Docker web service at
+<https://dot-matrix-ocr.onrender.com>, serving the UI at
+<https://dot-matrix-ocr.vercel.app/>.
 
 ## Endpoints
 

@@ -1,6 +1,10 @@
 # Dot Matrix OCR — Frontend
 
-Static UI (plain HTML/CSS/JS, no build step). Deployed to **Vercel**.
+**Live: <https://dot-matrix-ocr.vercel.app/>**
+
+Static UI (plain HTML/CSS/JS, no build step beyond generating `config.js`).
+Deployed to **Vercel**, calling the Render backend at
+<https://dot-matrix-ocr.onrender.com>.
 
 ```
 index.html           markup

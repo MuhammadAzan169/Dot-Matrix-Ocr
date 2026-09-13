@@ -1,8 +1,21 @@
 # Dot Matrix OCR
 
+**Live demo: <https://dot-matrix-ocr.vercel.app/>**
+
 Reads dot-matrix and laser-engraved digits off metal surfaces. A classical
 OpenCV pipeline cleans and reconstructs the scattered dots into connected
 glyphs, then a vision model reads the result.
+
+No image of your own? The demo offers three sample plates to try. The first
+request after a quiet spell takes about a minute — the free backend sleeps and
+has to wake up.
+
+| | URL |
+| --- | --- |
+| Frontend (Vercel) | <https://dot-matrix-ocr.vercel.app/> |
+| Backend API (Render) | <https://dot-matrix-ocr.onrender.com> |
+| API docs | <https://dot-matrix-ocr.onrender.com/docs> |
+| Health check | <https://dot-matrix-ocr.onrender.com/health> |
 
 The project runs two ways, from one codebase:
 
