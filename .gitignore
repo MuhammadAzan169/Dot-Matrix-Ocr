@@ -42,6 +42,9 @@ uploads/
 backend/uploads/
 *.log
 
+# Stage dumps from backend/tests/run_pipeline.py — regenerable
+backend/tests/_pipeline_out/
+
 # ---------------------------------------------------------------------------
 # Deployment tooling
 # ---------------------------------------------------------------------------

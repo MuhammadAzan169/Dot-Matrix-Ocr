@@ -315,17 +315,22 @@ class ImageProcessor:
         dilated_mask = cv2.dilate(final_mask, dilation_kernel, iterations=self.dilation_iterations)
         
         # Deskewing
-        coords = np.column_stack(np.where(dilated_mask > 0))
+        # np.where gives (row, col) = (y, x), but minAreaRect expects (x, y).
+        # Feeding it the transposed points measures the text box on its side,
+        # which read a -7 degree plate as 83 degrees and stood it upright.
+        coords = np.column_stack(np.where(dilated_mask > 0))[:, ::-1].astype(np.float32)
         if len(coords) == 0:
             return None, None, None, None
         
         rect = cv2.minAreaRect(coords)
         angle = rect[-1]
         
-        if angle < -45:
-            angle = -(90 + angle)
-        else:
-            angle = -angle
+        # OpenCV >= 4.5 returns an angle in (0, 90], so the old "angle < -45"
+        # branch never ran. Fold into [-45, 45] instead: a line of text is never
+        # more than 45 degrees off, so the smaller correction is always the
+        # right one. The result is already the rotation needed to undo the skew.
+        if angle > 45:
+            angle -= 90
         
         (h_img, w_img) = img.shape[:2]
         center = (w_img // 2, h_img // 2)
