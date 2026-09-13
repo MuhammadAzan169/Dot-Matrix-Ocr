@@ -501,7 +501,13 @@ class VLMOCR:
                     "content": [
                         {
                             "type": "text",
-                            "text": "What are the digits mentioned in the image? Answer in one line nothing else only digits."
+                            "text": (
+                                "This image is a serial number that was stamped into metal as a "
+                                "grid of dots and then digitally reconstructed, so the characters "
+                                "appear as thick white shapes on a black background. Some strokes "
+                                "are broken or uneven. Read the digits from left to right. "
+                                "Reply with the digits only - no spaces, no words, no explanation."
+                            )
                         },
                         {
                             "type": "image_url",
