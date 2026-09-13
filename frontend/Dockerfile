@@ -22,6 +22,7 @@ FROM nginx:1.27-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY index.html styles.css script.js /usr/share/nginx/html/
+COPY samples/ /usr/share/nginx/html/samples/
 COPY --from=config /build/config.js /usr/share/nginx/html/config.js
 
 EXPOSE 8080

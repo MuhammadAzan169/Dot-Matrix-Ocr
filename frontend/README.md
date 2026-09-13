@@ -4,6 +4,7 @@ Static UI (plain HTML/CSS/JS, no build step). Deployed to **Vercel**.
 
 ```
 index.html           markup
+samples/             three demo plates offered in the UI
 styles.css           styles
 script.js            upload flow, progress, result rendering
 config.js            GENERATED — do not edit by hand
@@ -67,6 +68,28 @@ python ../app.py               # http://localhost:8000
 python -m http.server 8080
 docker compose up --build      # http://localhost:8080
 ```
+
+## Sample plates
+
+`samples/` holds three synthetic dot-peen plates, offered under the upload card
+so a first-time visitor with no photo can still run the pipeline. Each card
+shows the correct digits, so the result can be judged at a glance; when a
+sample is used the UI says whether the read matched.
+
+| File | Reads | Surface |
+| --- | --- | --- |
+| `steel-plate.jpg` | 3184627 | Flat plate, slight tilt |
+| `gas-cylinder.jpg` | 7295140 | Curved, like a bottle neck |
+| `worn-part.jpg` | 5063918 | Scratched and dimly lit |
+
+They are generated, not photographed — regenerate with:
+
+```bash
+python ../backend/tests/generate_test_image.py --frontend-samples
+```
+
+All three are verified to pass the image pipeline. A file the user picks
+themselves has no known answer, so no verdict is shown for it.
 
 ## Note on uploads
 

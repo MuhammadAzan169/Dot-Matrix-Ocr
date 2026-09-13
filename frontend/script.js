@@ -13,6 +13,8 @@ const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
 
 const ocrResult = document.getElementById('ocrResult');
+const ocrVerdict = document.getElementById('ocrVerdict');
+const sampleCards = document.querySelectorAll('.sample-card');
 const copyBtn = document.getElementById('copyBtn');
 const newAnalysisBtn = document.getElementById('newAnalysisBtn');
 const retryBtn = document.getElementById('retryBtn');
@@ -32,6 +34,7 @@ const imgFinal = document.getElementById('imgFinal');
 
 let selectedFile = null;
 let backendAwake = false;  // set by the /health ping on page load
+let expectedDigits = null; // ground truth, only known for the built-in samples
 
 // Event Listeners
 uploadBtn.addEventListener('click', () => fileInput.click());
@@ -57,12 +60,14 @@ uploadCard.addEventListener('drop', (e) => {
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
+        expectedDigits = null;  // dropped file, answer unknown
         handleFile(files[0]);
     }
 });
 
 // File Selection
 function handleFileSelect(e) {
+    expectedDigits = null;  // a file the user picked has no known answer
     const file = e.target.files[0];
     if (file) {
         handleFile(file);
@@ -127,7 +132,19 @@ async function processImage() {
         });
 
         if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
+            // The API explains itself in `detail` ("OCR service not
+            // configured", "rate limited, try again in a minute"). Showing the
+            // bare status code threw that away and left the user guessing.
+            let detail = '';
+            try {
+                detail = (await response.json()).detail || '';
+            } catch (_) {
+                /* not JSON — fall back to the status line below */
+            }
+            if (response.status === 503) {
+                detail = detail || 'The OCR service is busy. Please try again in a minute.';
+            }
+            throw new Error(detail || `Server error: ${response.status}`);
         }
 
         updateProgress(30, 'Applying illumination correction...');
@@ -182,6 +199,20 @@ function displayResults(data) {
     // Set OCR result
     ocrResult.textContent = data.ocr_result || 'No digits detected';
 
+    // When a built-in sample was used we know the right answer, so say whether
+    // the read was correct instead of leaving the user to compare by eye.
+    if (expectedDigits) {
+        const correct = (data.ocr_result || '').trim() === expectedDigits;
+        ocrVerdict.textContent = correct
+            ? `Correct — matches the sample's ${expectedDigits}`
+            : `Expected ${expectedDigits} for this sample`;
+        ocrVerdict.classList.toggle('is-correct', correct);
+        ocrVerdict.classList.toggle('is-wrong', !correct);
+        ocrVerdict.classList.remove('hidden');
+    } else {
+        ocrVerdict.classList.add('hidden');
+    }
+
     // Set images
     imgOriginal.src = `data:image/png;base64,${data.images.original}`;
     imgIllumination.src = `data:image/png;base64,${data.images.illumination}`;
@@ -234,8 +265,10 @@ async function copyToClipboard() {
 // Reset App
 function resetApp() {
     selectedFile = null;
+    expectedDigits = null;
     fileInput.value = '';
     fileInfo.textContent = '';
+    ocrVerdict.classList.add('hidden');
     
     uploadSection.classList.remove('hidden');
     processingSection.classList.add('hidden');
@@ -290,6 +323,37 @@ function wakeBackend() {
         })
         .catch(() => console.log('Backend is waking up; first request may be slow'));
 }
+
+// Sample plates
+//
+// The samples ship with the frontend, so they are fetched from this origin and
+// turned into a File — exactly what an upload produces. That keeps the rest of
+// the flow identical whether the image came from disk or from one of these.
+async function useSample(card) {
+    const url = card.dataset.sample;
+    const name = url.split('/').pop();
+
+    sampleCards.forEach((c) => c.classList.remove('is-loading'));
+    card.classList.add('is-loading');
+
+    try {
+        const response = await fetch(url, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`could not load sample (${response.status})`);
+        const blob = await response.blob();
+        const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+
+        expectedDigits = card.dataset.expected || null;
+        handleFile(file);
+    } catch (err) {
+        showToast(`Could not load that sample: ${err.message}`, 'error');
+    } finally {
+        card.classList.remove('is-loading');
+    }
+}
+
+sampleCards.forEach((card) => {
+    card.addEventListener('click', () => useSample(card));
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {

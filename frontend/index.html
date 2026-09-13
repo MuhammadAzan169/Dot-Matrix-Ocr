@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dot Matrix OCR Enterprise System</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -65,6 +65,36 @@
                 </button>
                 <div class="file-info" id="fileInfo"></div>
             </div>
+
+            <!-- Sample plates, so a visitor with nothing to upload can still
+                 see the pipeline run end to end. -->
+            <div class="samples">
+                <p class="samples-title">No image handy? Try one of these</p>
+                <div class="samples-grid">
+                    <button class="sample-card" data-sample="samples/steel-plate.jpg" data-expected="3184627">
+                        <img src="samples/steel-plate.jpg" alt="Dot-peen digits on a steel plate" loading="lazy" width="827" height="203">
+                        <span class="sample-meta">
+                            <span class="sample-name">Steel plate</span>
+                            <span class="sample-digits">3184627</span>
+                        </span>
+                    </button>
+                    <button class="sample-card" data-sample="samples/gas-cylinder.jpg" data-expected="7295140">
+                        <img src="samples/gas-cylinder.jpg" alt="Dot-peen digits on a curved gas cylinder" loading="lazy" width="827" height="203">
+                        <span class="sample-meta">
+                            <span class="sample-name">Gas cylinder</span>
+                            <span class="sample-digits">7295140</span>
+                        </span>
+                    </button>
+                    <button class="sample-card" data-sample="samples/worn-part.jpg" data-expected="5063918">
+                        <img src="samples/worn-part.jpg" alt="Dot-peen digits on a worn, scratched part" loading="lazy" width="827" height="203">
+                        <span class="sample-meta">
+                            <span class="sample-name">Worn part</span>
+                            <span class="sample-digits">5063918</span>
+                        </span>
+                    </button>
+                </div>
+                <p class="samples-note">The digits under each image are the correct answer, so you can check the result.</p>
+            </div>
         </section>
 
         <!-- Processing Section -->
@@ -108,6 +138,9 @@
                 </div>
                 <div class="ocr-output">
                     <div class="ocr-text" id="ocrResult">-</div>
+                    <!-- Only filled in when a built-in sample was used, since
+                         that is the only time we know the correct answer. -->
+                    <div class="ocr-verdict hidden" id="ocrVerdict"></div>
                     <button class="btn-copy" id="copyBtn" title="Copy to clipboard">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -241,7 +274,7 @@
         <span id="toastMessage">Action completed</span>
     </div>
 
-    <script src="config.js"></script>
-    <script src="script.js"></script>
+    <script src="config.js?v=3"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>

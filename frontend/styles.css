@@ -122,9 +122,10 @@ body::before {
 /* Upload Section */
 .upload-section {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-height: 500px;
+    min-height: 420px;
 }
 
 .upload-card {
@@ -132,7 +133,7 @@ body::before {
     backdrop-filter: blur(20px);
     border: 2px dashed var(--border);
     border-radius: 24px;
-    padding: 4rem;
+    padding: 2.75rem 3rem;
     text-align: center;
     max-width: 600px;
     width: 100%;
@@ -633,5 +634,156 @@ body::before {
         left: 1rem;
         right: 1rem;
         bottom: 1rem;
+    }
+}
+
+
+/* ---------------------------------------------------------------------------
+   Sample plates
+   Offered under the upload card so a visitor with no photo of their own can
+   still run the pipeline. Width is matched to the upload card above so the two
+   read as one column rather than two loose blocks.
+   --------------------------------------------------------------------------- */
+
+.samples {
+    width: 100%;
+    max-width: 600px;
+    margin-top: 2.25rem;
+}
+
+/* A hairline rule with the label sitting in a gap, so the samples read as a
+   secondary option rather than a competing call to action. */
+.samples-title {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 1.1rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.samples-title::before,
+.samples-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+.samples-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.85rem;
+}
+
+.sample-card {
+    position: relative;
+    display: block;
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sample-card:hover,
+.sample-card:focus-visible {
+    border-color: var(--primary);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -12px rgba(102, 126, 234, 0.55);
+    outline: none;
+}
+
+.sample-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    /* Every sample is the same 827x203, so letting height follow the width
+       keeps the three cards aligned while showing the full number. Cropping to
+       a fixed height cut through the digits, which defeats a preview meant to
+       be read. */
+    aspect-ratio: 827 / 203;
+    object-fit: cover;
+    background: #0b1220;
+    transition: transform 0.35s ease;
+}
+
+.sample-card:hover img {
+    transform: scale(1.03);
+}
+
+.sample-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.6rem 0.75rem 0.7rem;
+    border-top: 1px solid var(--border);
+}
+
+.sample-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sample-digits {
+    font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    color: var(--text-secondary);
+}
+
+/* Clicking a sample kicks off a fetch; dim it so the click registers visually
+   even before the processing view takes over. */
+.sample-card.is-loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.samples-note {
+    margin-top: 0.85rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Verdict shown under the OCR result, samples only */
+.ocr-verdict {
+    width: 100%;
+    margin-top: 0.65rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.ocr-verdict.is-correct { color: var(--success); }
+.ocr-verdict.is-wrong   { color: var(--warning); }
+
+@media (max-width: 768px) {
+    .samples {
+        margin-top: 1.75rem;
+    }
+
+    .samples-grid {
+        grid-template-columns: 1fr;
+        gap: 0.6rem;
+    }
+
+    /* Keep the full-width thumbnail here too. A side-by-side thumb saves
+       height but crops to the middle three digits, which is worse than the
+       space it saves: at 390px wide the 4:1 plate is only ~95px tall anyway. */
+    .sample-meta {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: space-between;
     }
 }

@@ -17,6 +17,7 @@ photo — these are labelled by construction.
 
 ```bash
 python generate_test_image.py --all        # regenerate (seeded, reproducible)
+python generate_test_image.py --frontend-samples   # the UI's demo plates
 python generate_test_image.py --text 4815162342
 python run_pipeline.py                     # dump all 7 stages per plate
 ```
@@ -27,6 +28,20 @@ That is the one to look at — if the digits are not legible there, no model wil
 read them. Output lands in `_pipeline_out/` (git-ignored).
 
 To test the OCR step too, upload a plate through the running app.
+
+## The frontend's demo plates
+
+`--frontend-samples` writes three photo-realistic plates into
+`frontend/samples/`, which the UI offers to visitors who have no image of their
+own. They add what a phone camera really introduces — perspective, vignetting,
+surface curvature, scratches — on top of the same dot rendering.
+
+They are upscaled 1.3x and no more, for a concrete reason: `ImageProcessor`
+clusters dots with a fixed `eps=50, min_samples=8`, so dot pitch cannot grow
+without bound. At 1.6x the pitch reached ~19 px, every dot fell below
+`min_samples`, and the steel-plate sample was rejected as pure noise. Worth
+remembering if a real high-resolution photo ever returns "no clusters" —
+downscaling it is the fix.
 
 ## Why the dots are sized the way they are
 

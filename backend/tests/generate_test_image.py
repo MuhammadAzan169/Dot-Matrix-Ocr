@@ -122,6 +122,140 @@ def make_plate(
     return cv2.cvtColor(plate, cv2.COLOR_GRAY2BGR)
 
 
+# ---------------------------------------------------------------------------
+# Photo-realistic samples for the frontend "try one of these" strip.
+#
+# The plates above are deliberately clean test fixtures. These add the things a
+# phone camera actually introduces — perspective, vignetting, surface curvature,
+# scratches, JPEG softness — so a first-time visitor sees the tool handle a
+# picture that looks like one they would have taken themselves.
+# ---------------------------------------------------------------------------
+
+
+def add_scratches(img: np.ndarray, count: int = 40) -> np.ndarray:
+    """Fine tool marks across the surface, the way machined metal really looks.
+
+    Drawn onto their own layer and blended back at low opacity. Painting them
+    straight onto the plate produced bright hairlines that cut across the digits
+    and looked like a graphics bug rather than brushed steel.
+    """
+    h, w = img.shape[:2]
+    layer = img.copy()
+    for _ in range(count):
+        x1 = np.random.randint(-w // 6, w)
+        y1 = np.random.randint(0, h)
+        length = np.random.randint(w // 12, w // 4)
+        drift = np.random.randint(-2, 3)
+        # Stay close to the surface tone: real brush marks are a shade lighter
+        # or darker than the metal, never a bright white line.
+        shade = int(np.clip(np.random.normal(0, 1) * 10 + 100, 70, 135))
+        cv2.line(layer, (x1, y1), (x1 + length, y1 + drift), shade, 1, cv2.LINE_AA)
+
+    out = cv2.addWeighted(img, 0.78, layer, 0.22, 0)
+    # Never let a scratch dim an engraved dot — the dots are the signal.
+    return np.maximum(out, np.where(img > 150, img, 0))
+
+
+def add_vignette(img: np.ndarray, strength: float = 0.45) -> np.ndarray:
+    """Darken the corners the way a phone lens does."""
+    h, w = img.shape[:2]
+    kx = cv2.getGaussianKernel(w, w * 0.65)
+    ky = cv2.getGaussianKernel(h, h * 0.65)
+    mask = (ky @ kx.T)
+    mask = mask / mask.max()
+    return np.clip(img.astype(np.float32) * ((1 - strength) + strength * mask), 0, 255).astype(np.uint8)
+
+
+def add_curvature(img: np.ndarray, amount: float = 0.35) -> np.ndarray:
+    """Brighten a vertical band so the surface reads as a cylinder, like the
+    gas-bottle necks this project was trained on."""
+    h, w = img.shape[:2]
+    xs = np.linspace(-1, 1, w, dtype=np.float32)
+    band = np.exp(-(xs ** 2) / 0.25)
+    gain = 1.0 + amount * band
+    return np.clip(img.astype(np.float32) * gain[None, :], 0, 255).astype(np.uint8)
+
+
+def add_perspective(img: np.ndarray, tilt: float = 0.06) -> np.ndarray:
+    """Mild off-axis angle — a photo taken by hand is never square to the part.
+    Kept mild on purpose: the pipeline deskews rotation, not perspective."""
+    h, w = img.shape[:2]
+    dx, dy = w * tilt, h * tilt
+    src = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+    dst = np.float32([[dx, dy * 0.5], [w - dx * 0.3, 0], [w, h - dy * 0.4], [dx * 0.4, h]])
+    M = cv2.getPerspectiveTransform(src, dst)
+    return cv2.warpPerspective(img, M, (w, h), flags=cv2.INTER_CUBIC,
+                               borderMode=cv2.BORDER_REPLICATE)
+
+
+def make_photo(text: str, style: str) -> np.ndarray:
+    """A plate, weathered and photographed."""
+    plate = cv2.cvtColor(make_plate(text, **PHOTO_STYLES[style]["plate"]), cv2.COLOR_BGR2GRAY)
+    opts = PHOTO_STYLES[style]
+
+    plate = add_scratches(plate, opts["scratches"])
+    if opts["curvature"]:
+        plate = add_curvature(plate, opts["curvature"])
+    if opts["tilt"]:
+        plate = add_perspective(plate, opts["tilt"])
+    plate = add_vignette(plate, opts["vignette"])
+
+    # Upscale then re-soften: a phone photo is high resolution but never sharp
+    # at the pixel level, and the pipeline should cope with that.
+    #
+    # 1.3 is deliberate, not arbitrary. ImageProcessor clusters dots with
+    # DBSCAN at a fixed eps=50 / min_samples=8, so dot pitch cannot grow without
+    # bound: at 1.6 the pitch reached ~19 px, every dot fell below min_samples
+    # and the steel-plate sample was rejected as noise. Anything up to ~1.3
+    # clears it comfortably on all three styles.
+    plate = cv2.resize(plate, None, fx=1.3, fy=1.3, interpolation=cv2.INTER_CUBIC)
+    plate = cv2.GaussianBlur(plate, (3, 3), 0)
+
+    colour = cv2.cvtColor(plate, cv2.COLOR_GRAY2BGR)
+    # Faint colour cast — raw steel is never neutral grey under real light.
+    b, g, r = cv2.split(colour.astype(np.float32))
+    colour = cv2.merge([b * opts["cast"][0], g * opts["cast"][1], r * opts["cast"][2]])
+    return np.clip(colour, 0, 255).astype(np.uint8)
+
+
+PHOTO_STYLES = {
+    "steel-plate": {
+        "digits": "3184627",
+        "label": "Steel plate",
+        "plate": dict(angle=2.5, lighting=0.50, noise=7.0, blur=3),
+        "scratches": 70, "curvature": 0.0, "tilt": 0.05, "vignette": 0.28,
+        "cast": (1.02, 1.00, 0.97),
+    },
+    "gas-cylinder": {
+        "digits": "7295140",
+        "label": "Gas cylinder",
+        "plate": dict(angle=-3.0, lighting=0.60, noise=8.0, blur=3),
+        "scratches": 45, "curvature": 0.20, "tilt": 0.03, "vignette": 0.32,
+        "cast": (1.05, 0.99, 0.95),
+    },
+    "worn-part": {
+        "digits": "5063918",
+        "label": "Worn part",
+        "plate": dict(angle=4.5, lighting=0.72, noise=11.0, blur=5),
+        "scratches": 95, "curvature": 0.0, "tilt": 0.07, "vignette": 0.36,
+        "cast": (0.96, 0.99, 1.04),
+    },
+}
+
+
+def write_frontend_samples() -> None:
+    """Write the samples the UI offers when a visitor has no photo of their own."""
+    dest = HERE.parent.parent / "frontend" / "samples"
+    dest.mkdir(parents=True, exist_ok=True)
+    for style, opts in PHOTO_STYLES.items():
+        img = make_photo(opts["digits"], style)
+        out = dest / f"{style}.jpg"
+        cv2.imwrite(str(out), img, [cv2.IMWRITE_JPEG_QUALITY, 82])
+        kb = out.stat().st_size / 1024
+        print(f"  {out.name:20} {opts['label']:14} reads {opts['digits']}  "
+              f"{img.shape[1]}x{img.shape[0]}  {kb:.0f} KB")
+
+
 # name -> (text, kwargs). Ordered easy to hard.
 VARIANTS = {
     "easy":     ("123456", dict(angle=0.0, lighting=0.15, noise=3.0, blur=3)),
@@ -138,10 +272,16 @@ def main() -> None:
     ap.add_argument("--text", help="digits to render (0-9)")
     ap.add_argument("--out", type=Path, help="output path")
     ap.add_argument("--all", action="store_true", help="write the full difficulty set")
+    ap.add_argument("--frontend-samples", action="store_true",
+                    help="write the photo-realistic samples the UI offers")
     ap.add_argument("--seed", type=int, default=7, help="RNG seed (default: 7)")
     args = ap.parse_args()
 
     np.random.seed(args.seed)
+
+    if args.frontend_samples:
+        write_frontend_samples()
+        return
 
     if args.all:
         for name, (text, kw) in VARIANTS.items():
