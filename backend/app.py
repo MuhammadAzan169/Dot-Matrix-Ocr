@@ -529,9 +529,15 @@ class VLMOCR:
         if not result or not result.strip():
             raise ValueError("API returned empty OCR result")
 
-        # Clean up result - keep only digits
+        # Keep only digits. A response with none is not a reading of the plate —
+        # it is a model answering some other question. openrouter/free routed
+        # one request to a safety classifier, which replied "User Safety: safe",
+        # and falling back to the raw text handed that to the user as the serial
+        # number. Reject it so the caller moves on to the next model.
         cleaned = ''.join(filter(str.isdigit, result))
-        return cleaned or result
+        if not cleaned:
+            raise ValueError(f"model returned no digits: {result.strip()[:80]!r}")
+        return cleaned
 
     def perform_ocr(self, image_path, max_rounds=3):
         """Read the digits, rotating across every key before backing off.
@@ -607,6 +613,9 @@ async def read_root():
         "status": "ok",
         "docs": "/docs",
         "endpoints": ["/health", "/api/process"],
+        "ui": "This is the API. The web UI is deployed separately (Vercel); "
+              "locally, run `python app.py` from the repository root to get both "
+              "on http://localhost:8000",
     }
 
 
@@ -739,5 +748,9 @@ if __name__ == "__main__":
     # Use PORT environment variable for deployment compatibility
     port = int(os.getenv("PORT", 10000))
     logger.info(f"Starting server on port {port}")
+    # Running this file directly serves the API alone — "/" returns a JSON
+    # banner, not the page. The UI lives in frontend/ and is served either by
+    # Vercel or, locally, by the launcher at the repository root.
+    logger.info("API only. For the web UI, run  python app.py  from the repo root (http://localhost:8000)")
     logger.info(f"Upload directory: {UPLOAD_DIR.absolute()}")
     uvicorn.run(app, host="0.0.0.0", port=port)
