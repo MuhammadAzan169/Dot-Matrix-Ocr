@@ -1,0 +1,10 @@
+# Local-only files that should not be uploaded to Vercel. Note that config.js
+# is NOT listed: the build command rewrites it in place from Vercel's
+# environment variables, so the deployed copy is always the generated one.
+.env
+.env.*
+!.env.example
+Dockerfile
+docker-compose.yml
+nginx.conf
+README.md

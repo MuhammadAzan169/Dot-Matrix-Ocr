@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Runtime artifacts
+uploads/
+*.log
+
+# Training / research only — 33 MB of dataset, weights and run artifacts that
+# app.py never imports. This is the single most important exclusion here.
+ocr/
+
+# Not needed inside the image
+.git/
+.gitignore
+.gitattributes
+README.md
+setup_local.ps1
+render.yaml
+docker-compose.yml

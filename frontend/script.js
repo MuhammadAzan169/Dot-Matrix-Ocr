@@ -31,6 +31,7 @@ const imgDeskewed = document.getElementById('imgDeskewed');
 const imgFinal = document.getElementById('imgFinal');
 
 let selectedFile = null;
+let backendAwake = false;  // set by the /health ping on page load
 
 // Event Listeners
 uploadBtn.addEventListener('click', () => fileInput.click());
@@ -74,6 +75,14 @@ function handleFile(file) {
         return;
     }
 
+    // Reject oversized files here rather than after a long upload that the
+    // server would refuse anyway. Limit comes from MAX_UPLOAD_MB in .env.
+    const maxMb = (window.APP_CONFIG && window.APP_CONFIG.MAX_UPLOAD_MB) || 10;
+    if (file.size > maxMb * 1024 * 1024) {
+        showToast(`Image is ${formatFileSize(file.size)} — the limit is ${maxMb} MB`, 'error');
+        return;
+    }
+
     selectedFile = file;
     fileInfo.textContent = `Selected: ${file.name} (${formatFileSize(file.size)})`;
     
@@ -98,6 +107,12 @@ async function processImage() {
     formData.append('file', selectedFile);
 
     try {
+        // A sleeping Render free instance takes ~50s to come back. Say so,
+        // instead of letting the progress bar look frozen.
+        if ((window.API_BASE_URL || '') && !backendAwake) {
+            updateProgress(0, 'Waking the server (first request can take a minute)...');
+        }
+
         // Simulate progress steps
         updateProgress(0, 'Uploading image...');
         await sleep(300);
@@ -106,7 +121,7 @@ async function processImage() {
         await sleep(300);
 
         // Make API call
-        const response = await fetch('/api/process', {
+        const response = await fetch(`${window.API_BASE_URL || ''}/api/process`, {
             method: 'POST',
             body: formData
         });
@@ -260,7 +275,24 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Render's free tier spins the instance down after ~15 minutes idle, and the
+// cold start costs about a minute. Pinging /health on page load lets the
+// backend wake up while the user is still picking a file.
+function wakeBackend() {
+    const base = window.API_BASE_URL || '';
+    const enabled = !window.APP_CONFIG || window.APP_CONFIG.WAKE_BACKEND !== false;
+    if (!base || !enabled) return; // same-origin (local) — nothing to wake
+    backendAwake = false;
+    fetch(`${base}/health`, { method: 'GET', cache: 'no-store' })
+        .then((r) => {
+            backendAwake = r.ok;
+            console.log('Backend is awake');
+        })
+        .catch(() => console.log('Backend is waking up; first request may be slow'));
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Dot Matrix OCR Enterprise System initialized');
+    wakeBackend();
 });

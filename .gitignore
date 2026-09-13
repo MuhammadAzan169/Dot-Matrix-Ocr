@@ -1,4 +1,18 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit a real key.
+# The .env.example files in backend/ and frontend/ ARE tracked; copy them.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+secrets.*
+
+# ---------------------------------------------------------------------------
 # Python
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,58 +20,57 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
-develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
 sdist/
-var/
 wheels/
 *.egg-info/
-.installed.cfg
 *.egg
+.installed.cfg
 
-# Environment variables
-.env
-.env.local
+# ---------------------------------------------------------------------------
+# Runtime artifacts
+# ---------------------------------------------------------------------------
+# Intermediate pipeline images. Deleted after each request, but a crash or
+# KEEP_UPLOADS=1 can leave them behind.
+uploads/
+backend/uploads/
+*.log
 
-# Uploads directory (processed images)
-uploads/*
-!uploads/.gitkeep
+# ---------------------------------------------------------------------------
+# Deployment tooling
+# ---------------------------------------------------------------------------
+.vercel/
 
-# IDE
+# ---------------------------------------------------------------------------
+# ML training output (backend/ocr) — checkpoints and run artifacts are large
+# and reproducible. The committed weights under runs/ are tracked via Git LFS;
+# anything new that training writes is not wanted in git.
+# ---------------------------------------------------------------------------
+backend/ocr/runs/**/weights/epoch*.pt
+backend/ocr/**/*.cache
+wandb/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
-# Secrets and keys
-secrets.*
-*.key
-*.pem
-*.crt
-
-# Config files with possible API keys
-config/*.json
-config/*.yaml
-
-# Jupyter notebook checkpoints
-*.ipynb_checkpoints
-
-# Test output and coverage
+# ---------------------------------------------------------------------------
+# Notebooks / tests
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/
 .coverage
 htmlcov/
+.pytest_cache/

@@ -44,7 +44,7 @@ if (-not (Test-Path "uploads")) {
 
 # Check if static files exist
 Write-Host "Verifying project structure..." -ForegroundColor White
-$requiredFiles = @("app.py", "index.html", "requirements.txt", "Dockerfile", "README.md", "script.js", "styles.css")
+$requiredFiles = @("app.py", "requirements.txt", "Dockerfile", ".env.example", "README.md")
 $missingFiles = @()
 
 foreach ($file in $requiredFiles) {
@@ -69,7 +69,7 @@ Write-Host "To start the server, run:" -ForegroundColor White
 Write-Host "  python app.py`n" -ForegroundColor Yellow
 
 Write-Host "The app will be available at:" -ForegroundColor White
-Write-Host "  http://localhost:8000`n" -ForegroundColor Cyan
+Write-Host "  http://localhost:10000`n" -ForegroundColor Cyan
 
 Write-Host "Before deploying to any remote host:" -ForegroundColor White
 Write-Host "  1. Test the app locally" -ForegroundColor White

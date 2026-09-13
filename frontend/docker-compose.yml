@@ -1,0 +1,19 @@
+# Local preview of the static frontend:  docker compose up --build
+# config.js is generated during the build from the args below, so there is
+# nothing to edit by hand. Defaults assume the backend is on :10000.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Where the browser should send API calls. Points at the backend
+        # container's published port, not its compose service name, because
+        # the request is made by your browser, not by this container.
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:10000}
+        MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+    image: dot-matrix-ocr-web
+    container_name: dot-matrix-ocr-web
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

@@ -1,0 +1,33 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# NOTE: Render only auto-detects a blueprint named render.yaml at the REPOSITORY
+# ROOT. Kept here with the rest of the backend config, this file is a spec you
+# either (a) copy to the repo root to use "New -> Blueprint", or (b) read off
+# when creating the web service by hand — the settings below map 1:1 onto the
+# dashboard form. Option (b) needs no root file and is what backend/README.md
+# walks through.
+#
+# rootDir stays "backend" because these paths are resolved from the repo root.
+services:
+  - type: web
+    name: dot-matrix-ocr-api
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Set this in the Render dashboard (Environment -> Add Secret).
+      # sync: false keeps the value out of this file and out of git.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OCR_MODEL
+        value: openrouter/free
+      # Replace with your Vercel domain(s) once the frontend is deployed.
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: PYTHON_VERSION
+        value: "3.10"

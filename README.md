@@ -1,212 +1,113 @@
-# 🔍 Dot Matrix OCR Enterprise System
+# Dot Matrix OCR
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green)](https://fastapi.tiangolo.com)
-[![OpenCV](https://img.shields.io/badge/OpenCV-4.8.1-red)](https://opencv.org)
+Reads dot-matrix and laser-engraved digits off metal surfaces. A classical
+OpenCV pipeline cleans and reconstructs the scattered dots into connected
+glyphs, then a vision model reads the result.
 
-An advanced OCR system specifically designed for reading dot matrix printed text commonly found in industrial and manufacturing environments. This system uses sophisticated computer vision techniques combined with AI-powered text recognition to accurately extract digits from challenging dot matrix images.
+The project runs two ways, from one codebase:
 
-## ✨ Features
+| | Local | Deployed |
+| --- | --- | --- |
+| How | `python app.py` — one server, one port | frontend on Vercel, backend on Render |
+| UI ↔ API | same origin, no CORS | HTTPS across origins, CORS + `API_BASE_URL` |
+| Cold start | none | ~50s after 15 min idle (Render free) |
 
-- **🎯 Specialized for Dot Matrix**: Optimized specifically for dot matrix text recognition
-- **💡 Adaptive Illumination Correction**: Normalizes uneven lighting conditions
-- **🔬 Advanced Computer Vision Pipeline**: 7-step processing with DBSCAN clustering
-- **🤖 AI-Powered OCR**: Leverages Vision Language Models via OpenRouter
-- **📊 Real-time Visualization**: View each processing stage with beautiful UI
-- **🎨 Modern Dark Theme**: Clean, professional interface with smooth animations
-- **🔄 Batch Processing Ready**: Easily extendable for bulk OCR operations
+## Layout
 
-## 🚀 Live Demo
+```
+app.py        Local launcher — serves frontend/ and backend/ as one app
+README.md     This file
+.gitignore
 
-Simply upload a dot matrix image and watch the magic happen! The system will:
-1. Upload your image
-2. Process it through 7 stages
-3. Display intermediate results
-4. Show extracted digits
+frontend/     Static UI → Vercel
+  index.html  styles.css  script.js
+  config.js         generated — do not edit
+  generate-config.js  bakes .env into config.js (Vercel's build command)
+  .env  .env.example   API_BASE_URL, WAKE_BACKEND, MAX_UPLOAD_MB
+  vercel.json  .vercelignore
+  Dockerfile  .dockerignore  nginx.conf  docker-compose.yml  README.md
 
-## 🛠️ How It Works
-
-The system processes images through a sophisticated 7-stage pipeline:
-
-| Step | Process | Description |
-|------|---------|-------------|
-| 1️⃣ | **Original Image** | Input image uploaded for processing |
-| 2️⃣ | **Illumination Correction** | Adaptive brightness normalization |
-| 3️⃣ | **Thresholding** | Binary conversion for feature extraction |
-| 4️⃣ | **Cluster Detection** | Connected component analysis |
-| 5️⃣ | **DBSCAN Filtering** | Density-based spatial clustering |
-| 6️⃣ | **Deskewing** | Automatic rotation correction |
-| 7️⃣ | **VLM OCR** | AI-powered text extraction |
-
-## 📋 Usage
-
-### Web Interface
-1. Click "Choose Image" or drag & drop a dot matrix image
-2. Watch real-time processing through 7 stages
-3. View extracted digits with copy-to-clipboard functionality
-4. Click "New Analysis" to process another image
-
-### API Usage
-```bash
-curl -X POST "http://localhost:8000/api/process" \
-  -F "file=@your_image.png"
+backend/      FastAPI + OpenCV API → Render (Docker, free tier)
+  app.py  requirements.txt
+  .env  .env.example    OPENROUTER_API_KEY, OCR_MODEL, ALLOWED_ORIGINS, ...
+  Dockerfile  .dockerignore  docker-compose.yml
+  render.yaml           Render service spec
+  .gitattributes        Git LFS rules for the model weights below
+  setup_local.ps1  README.md
+  ocr/                  YOLO training, dataset, weights — research only
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "session_id": "uuid-string",
-  "images": {
-    "original": "base64-string",
-    "illumination": "base64-string",
-    "threshold": "base64-string",
-    "clustered": "base64-string",
-    "dbscan": "base64-string",
-    "deskewed": "base64-string",
-    "final": "base64-string"
-  },
-  "ocr_result": "1234567890"
-}
-```
+`backend/ocr/` sits with the backend because it is the same Python/ML side of
+the project, but it is **not deployed**: `backend/.dockerignore` excludes it, so
+its 33 MB of dataset and weights never enter the image. `backend/app.py` imports
+none of it.
 
-## 🏗️ Technical Stack
+## Run everything locally
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Backend** | FastAPI (Python) | REST API server |
-| **Image Processing** | OpenCV, scikit-learn, NumPy | Computer vision pipeline |
-| **AI/ML** | OpenAI VLM via OpenRouter | Text recognition |
-| **Frontend** | Vanilla JS + Modern CSS | Interactive UI |
-| **Deployment** | Docker (container) | Cloud or local container hosting |
-| **Storage** | Session-based file system | Temporary image storage |
-
-## ⚙️ Configuration
-
-### Deployment
-Follow the instructions for your chosen host. For local testing and container deployments, set the environment variables and run the container or the app directly.
-
-### Get OpenRouter API Key
-1. Visit [OpenRouter](https://openrouter.ai)
-2. Sign up and get your API key
-
-### Environment Variables
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8000` | Server port (default for local/container deployments) |
-| `OPENROUTER_API_KEY` | Required | Your OpenRouter API key |
-| `OCR_MODEL` | `openrouter/free` | Model to use for OCR |
-
-## 🐳 Local Development
-
-### Quick Start
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 3. Set environment variable
-export OPENROUTER_API_KEY="your-api-key-here"
-
-# 4. Run the application
+pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env      # then add your OPENROUTER_API_KEY
 python app.py
 ```
 
-### Docker Development
+Open <http://localhost:8000>. The UI, the API, and `/docs` are all on that one
+port, so there is no CORS and nothing to configure — `API_BASE_URL` is empty by
+default, which makes the page call its own origin.
+
 ```bash
-# Build and run with Docker
-docker build -t dot-matrix-ocr .
-docker run -p 8000:8000 -e OPENROUTER_API_KEY="your-key" dot-matrix-ocr
+python app.py --port 5000     # different port
+python app.py --reload        # restart on file changes
+python app.py --host 0.0.0.0  # reachable from your phone on the same wifi
 ```
 
-## 📁 Project Structure
-```
-.
-├── app.py                  # FastAPI application
-├── index.html             # Main HTML page
-├── styles.css             # CSS styles
-├── script.js              # Frontend JavaScript
-├── README.md              # This documentation
-├── requirements.txt       # Python dependencies
-├── Dockerfile            # Container configuration
-├── .dockerignore         # Docker ignore rules
-└── uploads/              # Temporary uploads (auto-created)
+Prefer the split setup locally (closer to production, needs Docker):
+
+```bash
+docker compose -f backend/docker-compose.yml -f frontend/docker-compose.yml up --build
+# UI http://localhost:8080   API http://localhost:10000
 ```
 
-## 🔧 API Documentation
+## Pipeline
 
-### POST `/api/process`
-Process an image through the OCR pipeline.
+1. Adaptive illumination correction (divide by a heavy Gaussian blur)
+2. Binary threshold + morphological close
+3. Connected components, filtered by area
+4. DBSCAN over component centroids to drop background speckle
+5. Deskew via `minAreaRect`, then crop
+6. Vertical projection to split digit blocks
+7. Tapered lines joining nearby dots within each block
+8. Vision-model read of the reconstructed image (OpenRouter)
 
-**Request:**
-- Content-Type: `multipart/form-data`
-- Body: `file` (image file)
+Every stage is returned to the UI as an image, so you can see where a bad read
+went wrong.
 
-**Response:**
-- Status: `200 OK` on success
-- Content-Type: `application/json`
-- Body: Processing results with base64 images
+## Deploying
 
-### GET `/`
-Serve the web interface.
+Order matters — the frontend needs the backend's URL, and the backend needs the
+frontend's origin for CORS.
 
-### GET `/styles.css`
-Serve CSS styles.
+1. **Backend → Render.** [backend/README.md](backend/README.md). New Web
+   Service, Root Directory `backend`, Runtime `Docker`, Instance Type `Free`,
+   Health Check Path `/health`. Set `OPENROUTER_API_KEY`. Copy the resulting
+   `https://<name>.onrender.com`.
+2. **Frontend → Vercel.** [frontend/README.md](frontend/README.md). Import the
+   repo with Root Directory `frontend`, and set `API_BASE_URL` to the Render URL
+   in the project's Environment Variables. The build command bakes it into
+   `config.js`.
+3. **Close the loop.** Set `ALLOWED_ORIGINS` on Render to your Vercel domain and
+   redeploy the backend.
 
-### GET `/script.js`
-Serve JavaScript code.
+## What the free tier costs you
 
-### GET `/favicon.ico`
-Serve favicon.
+Every feature works on Render's free plan — nothing is disabled. Three
+operational limits are worth knowing, and the code already accounts for each:
 
-## 🧪 Testing
+| Limit | Effect | What the code does |
+| --- | --- | --- |
+| Sleeps after ~15 min idle | First request takes ~50s | The page pings `/health` on load and tells the user the server is waking, instead of freezing the progress bar |
+| 512 MB RAM, 0.1 CPU | Large images are slow | One uvicorn worker (more OOMs the instance); the UI rejects files over `MAX_UPLOAD_MB` before uploading |
+| Ephemeral disk, no volume | Nothing persists between deploys | Intermediate images are returned inline as base64 and the session directory is deleted immediately, so nothing needs to persist |
 
-Test with sample dot matrix images:
-- Low-contrast images
-- Rotated/angled text
-- Uneven lighting conditions
-- Broken/dotted characters
-
-## 🚨 Error Handling
-
-The system includes comprehensive error handling:
-- **Rate limiting**: Automatic retry with exponential backoff
-- **API failures**: Graceful degradation with user-friendly messages
-- **Invalid images**: Early validation and helpful error messages
-- **Network issues**: Connection timeout and retry logic
-
-## 📊 Performance
-
-- **Processing time**: ~10-30 seconds depending on image complexity
-- **Image size**: Optimized for typical dot matrix images
-- **Concurrency**: Session-based processing prevents conflicts
-- **Memory usage**: Efficient processing with intermediate cleanup
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) file for details.
-
-## 🙏 Credits
-
-- **FastAPI**: Modern web framework for building APIs
-- **OpenCV**: Industry-standard computer vision library
-- **OpenRouter**: Unified API for AI models
--- **Container hosting**: For running the app in Docker on any host
-
-## 🌟 Support
-
-For issues, feature requests, or questions:
-1. Check the [FAQ](#) section
-2. Open an issue on the project repository or your hosting provider
-3. Contact the maintainer
-
----
-
-**Built with ❤️ for industrial OCR applications**
-
-*Perfect for manufacturing, logistics, inventory management, and any application requiring dot matrix text recognition.*
+Locally none of these apply: no sleep, your full CPU and RAM, and
+`KEEP_UPLOADS=1` in `backend/.env` keeps every intermediate image on disk under
+`backend/uploads/` for inspection.

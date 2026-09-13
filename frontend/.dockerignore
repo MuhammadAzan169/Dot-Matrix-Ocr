@@ -1,0 +1,11 @@
+# Secrets and local-only files — the image gets its config from build args.
+.env
+.env.*
+!.env.example
+
+.git/
+README.md
+vercel.json
+.vercelignore
+docker-compose.yml
+config.js
